@@ -27,4 +27,4 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-        run: python pr_analysis.py
+        run: python pr_analyzer.py
