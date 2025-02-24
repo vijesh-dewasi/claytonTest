@@ -125,10 +125,12 @@ def analyze_pull_request():
     pr = get_pull_request()
     if pr:
         pr_details = get_pr_details(pr)
-        print(f"PR Title: {pr_details['title']}")
-        print(f"Author: {pr_details['author']}")
-        print(f"PR URL: {pr_details['url']}")
-        print(f"PR Description: {pr_details['description']}")
+        summary = []
+        summary.append(f"**PR Title:** {pr_details['title']}")
+        summary.append(f"**Author:** {pr_details['author']}")
+        summary.append(f"**PR URL:** {pr_details['url']}")
+        summary.append(f"**PR Description:** {pr_details['description']}")
+        summary.append("\n### Code Changes Summary:\n")
         
         # Fetch the files changed in this PR
         files_changed = get_pr_files()
@@ -140,10 +142,13 @@ def analyze_pull_request():
                 
                 # Summarize the code changes using LangChain
                 pr_summary = summarize_code_changes(file['patch'])
+                summary.append(f"- **{file['filename']}**: \n{pr_summary}")
                 print(f"Code Changes Summary: {pr_summary}")
                 print("="*80)
+        return "\n".join(summary)  # Return the formatted summary as a string
     else:
         print("No PRs found or error fetching PRs.")
+        return "No PRs found or error fetching PRs."
 
 # ================================================================================================================================================
 # post comment on the pr
@@ -153,8 +158,12 @@ def post_pr_comment(comment):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{PR_NUMBER}/comments"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     payload = {"body": comment}
-    requests.post(url, headers=headers, json=payload)
-
+    response = requests.post(url, headers=headers, json=payload)
+    
+    if response.status_code == 201:
+        print("Comment posted successfully.")
+    else:
+        print(f"Failed to post comment: {response.status_code}, {response.text}")
 
 # ================================================================================================================================================
 
