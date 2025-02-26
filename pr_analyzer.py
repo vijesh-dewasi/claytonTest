@@ -1,7 +1,6 @@
 import requests
-# from langchain_core.prompts import PromptTemplate
-from langchain_mistralai import ChatMistralAI
 from langchain.prompts import PromptTemplate
+from langchain_mistralai import ChatMistralAI
 from dotenv import load_dotenv, find_dotenv
 import os
 
@@ -63,9 +62,18 @@ def get_pr_details(pr):
 
 
 # ================================================================================================================================================
+# Get rules
+
+def getApexRules():
+    """get rules from the apex rules file"""
+    with open("apex_rules.txt", "r", encoding="utf-8") as f:
+        all_rules = f.readlines()
+        return "".join(rule for rule in all_rules)
+
+# ================================================================================================================================================
 
 # Summarizing code changes using LangChain
-def summarize_code_changes(code_diff):
+def summarize_code_changes(code_diff, apex_rules):
     # Create a prompt template for code summarization
     # Define the prompt template
     prompt_template = """
@@ -77,19 +85,19 @@ def summarize_code_changes(code_diff):
         - If no issues are found, explicitly state that the code follows best practices.
 
         **Common Apex Issues to Detect:**
-        1️⃣ **SOQL inside `for` loops** → Avoid SOQL queries inside loops to prevent governor limit errors.
-        2️⃣ **Unsecured SOQL queries** → Ensure queries have proper filtering to avoid security risks.
-        3️⃣ **Unbulkified DML operations** → Optimize DML statements for large datasets to prevent governor limit errors.
-        4️⃣ **Hardcoded IDs** → Avoid hardcoding IDs; fetch them dynamically instead.
-        5️⃣ **Improper use of `@AuraEnabled`** → Ensure methods are secured and properly scoped.
-        6️⃣ **Excessive CPU time usage** → Avoid deep nesting and unnecessary computations to reduce CPU time.
+        {apex_rules}
 
         **Response Format:**
         ```
+        ERRORS: 
         [file_name.cls]
         Line [line_number]: [Issue Type] - [Description]
         Suggestion: [Possible Fix]
-        Severity: [Error or warning]
+
+        WARNING: 
+        [file_name.cls]
+        Line [line_number]: [Issue Type] - [Description]
+        Suggestion: [Possible Fix]
         ```
 
         **Pull Request Data:**
@@ -99,7 +107,7 @@ def summarize_code_changes(code_diff):
         - Carefully examine each line of code for the issues listed above.
         - Provide a detailed analysis, specifying the line number and type of issue and please mention the severity of issue detected during your analysis.
         - Offer clear and actionable suggestions for improvement.
-        - Ensure your response is structured and easy to understand.
+        - Ensure your response is structured and easy to understand and don't include any unecessory information on resonse, keep it short.
         - Also mention Error vs Warning which may be caused by the issue listed.
         - Categorised and group the feedback/(issues detected) based on their severity.
     """
@@ -114,7 +122,7 @@ def summarize_code_changes(code_diff):
     chain = prompt | llm
 
     # Get summary of code changes
-    summary = chain.invoke({"pr_data": code_diff})
+    summary = chain.invoke({"pr_data": code_diff, "apex_rules": apex_rules})
     return summary.content
 
 # ================================================================================================================================================
@@ -134,6 +142,7 @@ def analyze_pull_request():
         
         # Fetch the files changed in this PR
         files_changed = get_pr_files()
+        apex_rules = getApexRules()
         if files_changed:
             for file in files_changed:
                 # print(f"File: {file['filename']}")
@@ -141,7 +150,7 @@ def analyze_pull_request():
                 # print(f"Changes: {file['patch'][:500]}...")  # Limit the output for large diffs
                 
                 # Summarize the code changes using LangChain
-                pr_summary = summarize_code_changes(file['patch'])
+                pr_summary = summarize_code_changes(file['patch'], apex_rules)
                 summary.append(f"- **{file['filename']}**: \n{pr_summary}")
                 print(f"Code Changes Summary: {pr_summary}")
                 print("="*80)
@@ -171,4 +180,4 @@ def post_pr_comment(comment):
 
 if __name__ == "__main__":
     analysis_result = analyze_pull_request()
-    post_pr_comment(analysis_result)
+    # post_pr_comment(analysis_result)
