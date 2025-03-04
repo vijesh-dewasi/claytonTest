@@ -184,4 +184,5 @@ def post_pr_comment(comment):
 
 if __name__ == "__main__":
     analysis_result = analyze_pull_request()
+    print(analysis_result)
     post_pr_comment(analysis_result)
