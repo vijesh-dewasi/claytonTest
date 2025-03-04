@@ -31,8 +31,11 @@ jobs:
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
-          set -e
-          python pr_analyzer.py > analysis_result.txt
+          set -e  # Stop on error
+          python pr_analyzer.py | tee analysis_result.txt  # Output to console & file
+          echo "========== ANALYSIS RESULT =========="
+          cat analysis_result.txt  # Display output for debugging
+          echo "====================================="
           if grep -q "LLM_STATUS: FAIL" analysis_result.txt; then
             echo "Errors detected in PR. Failing the workflow."
             exit 1
