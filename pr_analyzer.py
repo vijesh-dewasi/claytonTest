@@ -62,7 +62,7 @@ def get_pr_details(pr):
 
 
 # ================================================================================================================================================
-# Get rules
+# Get apex rules
 
 def getApexRules():
     """get rules from the apex rules file"""
@@ -77,24 +77,20 @@ def summarize_code_changes(code_diff, apex_rules):
     # Create a prompt template for code summarization
     # Define the prompt template
     prompt_template = """
-        You are an **Apex Code Review AI** specialized in analyzing pull requests for best practices, governor limits, and security risks.
+        You are an **Apex Code Review AI**, specialized in reviewing Apex pull requests for best practices, governor limits, and security risks.
 
         **Objective:**
-        - Review the entire code thoroughly before making judgments.
-        - Identify potential issues and suggest improvements.
-        - If no issues are found, explicitly state that the code follows best practices.
+        - Identify potential issues in the provided Apex code.
+        - Categorize findings as **Errors** or **Warnings** based on severity.
+        - If no issues are found, explicitly state: `NO_ISSUES_DETECTED`.
 
         **Common Apex Issues to Detect:**
         {apex_rules}
 
         **Response Format:**
         ```
-        ERRORS: 
-        [file_name.cls]
-        Line [line_number]: [Issue Type] - [Description]
-        Suggestion: [Possible Fix]
-
-        WARNING: 
+        [SEVERITY: High/Medium/Low]
+        [ERROR/WARNING]
         [file_name.cls]
         Line [line_number]: [Issue Type] - [Description]
         Suggestion: [Possible Fix]
@@ -104,16 +100,17 @@ def summarize_code_changes(code_diff, apex_rules):
         {pr_data}
 
         **Instructions:**
-        - Carefully examine each line of code for the issues listed above.
-        - Provide a detailed analysis, specifying the line number and type of issue and please mention the severity of issue detected during your analysis.
-        - Offer clear and actionable suggestions for improvement.
-        - Ensure your response is structured and easy to understand and don't include any unecessory information on resonse, keep it short.
-        - Also mention Error vs Warning which may be caused by the issue listed.
-        - Categorised and group the feedback/(issues detected) based on their severity.
+        - Analyze each line of code carefully.
+        - Group issues under **High**, **Medium**, and **Low** severity.
+        - Clearly mention whether the issue is an **Error** or **Warning**.
+        - Provide specific **line numbers** and **issue types**.
+        - Offer **concise, actionable suggestions** (avoid generic responses).
+        - If no issues are found, output: `NO_ISSUES_DETECTED`.
     """
 
 
-    prompt = PromptTemplate(input_variables=["pr_data"], template=prompt_template)
+
+    prompt = PromptTemplate(input_variables=["pr_data", "apex_rules"], template=prompt_template)
 
     # Initialize Mistral Chat Model
     llm = ChatMistralAI(model="mistral-large-latest", temperature=0.7)
@@ -143,21 +140,28 @@ def analyze_pull_request():
         # Fetch the files changed in this PR
         files_changed = get_pr_files()
         apex_rules = getApexRules()
+        has_errors = False  # Track if errors are detected
+
         if files_changed:
             for file in files_changed:
-                # print(f"File: {file['filename']}")
-                # print(f"Status: {file['status']}")
-                # print(f"Changes: {file['patch'][:500]}...")  # Limit the output for large diffs
-                
-                # Summarize the code changes using LangChain
                 pr_summary = summarize_code_changes(file['patch'], apex_rules)
                 summary.append(f"- **{file['filename']}**: \n{pr_summary}")
-                print(f"Code Changes Summary: {pr_summary}")
-                print("="*80)
-        return "\n".join(summary)  # Return the formatted summary as a string
+
+                # Check if "ERROR" is found in the LLM response
+                if "ERROR" in pr_summary:
+                    has_errors = True  # Mark errors found
+
+        # Append status for GitHub Actions check
+        if has_errors:
+            summary.append("\nLLM_STATUS: FAIL")
+        else:
+            summary.append("\nLLM_STATUS: PASS")
+        return "\n".join(summary)
+
     else:
         print("No PRs found or error fetching PRs.")
-        return "No PRs found or error fetching PRs."
+        return "No PRs found or error fetching PRs.\nLLM_STATUS: FAIL"
+
 
 # ================================================================================================================================================
 # post comment on the pr
