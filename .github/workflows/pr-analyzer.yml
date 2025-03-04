@@ -1,7 +1,7 @@
 name: PR Code Analysis
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -30,4 +30,10 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-        run: python pr_analyzer.py
+        run: |
+          set -e
+          python pr_analyzer.py > analysis_result.txt
+          if grep -q "LLM_STATUS: FAIL" analysis_result.txt; then
+            echo "Errors detected in PR. Failing the workflow."
+            exit 1
+          fi
