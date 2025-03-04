@@ -10,6 +10,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      actions: read  # Ensure actions can access secrets
 
     steps:
       - name: Checkout Repository
